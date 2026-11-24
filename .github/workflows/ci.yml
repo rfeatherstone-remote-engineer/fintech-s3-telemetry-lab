@@ -1,0 +1,30 @@
+name: FinTech PCI-DSS Telemetry CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run zero-dependency unittest suite
+        run: python3 -m unittest discover -s tests -v
+      - name: Smoke-test dry-run & fault injection
+        run: python3 -m remediation.self_healer --inject-fault pan_leak
+      - name: Generate SHA256SUMS & SPDX 2.3 SBOM
+        run: |
+          find compliance core detections remediation runbooks templates tests -type f | sort | xargs sha256sum > SHA256SUMS
+          python3 -c 'import json,datetime; print(json.dumps({"spdxVersion":"SPDX-2.3","name":"fintech-s3-telemetry-lab","creationInfo":{"created":datetime.datetime.now(datetime.timezone.utc).isoformat()}},indent=2))' > sbom.spdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fintech-compliance-provenance
+          path: |
+            SHA256SUMS
+            sbom.spdx.json
